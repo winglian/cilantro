@@ -1,0 +1,48 @@
+---
+
+ip: 192.168.10.10
+netmask: 255.255.255.0
+
+ssh:
+    public:
+        - key: ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA6NF8iallvQVp22WDkTkyrtvp9eWW6A8YVr+kz4TjGYe7gHzIw+niNltGEFHzD8+v1I2YJ6oXevct1YeS0o9HZyN1Q9qgCgzUFtdOKLv6IedplqoPkcmF0aYet2PkEDo3MlTBckFXPITAMzF8dJSIFo9D8HfdOV0IAdx4O7PtixWKn5y2hMNG0zQPyUecp4pzC6kivAIhyfHilFR61RGL+GPXQ2MWZWFYbAGjyiYJnAmCP3NOTd0jMZEnDkbUvxhMmBYSdETk1rRgm+R4LOzFUGaHqHDLKLX+FIPKcF96hrucXzcWyLbIbEgE98OHlnVYCzRdK8jlqm8tehUc9c9WhQ== vagrant insecure public key
+        - key: ~/.ssh/id_rsa.pub
+    private: ~/.ssh/id_rsa
+
+services:
+    - name: memcache
+      alias: memcache
+    - name: mysql
+      alias: db
+    - name: gearman
+      alias: gearman
+    - name: web
+      ports: 
+      - '8080:80'
+    - name: varnish
+      vcl: etc/varnish/default.vcl
+      ports:
+      - '80:80'
+
+mysql_password: secret
+
+folders:
+    - map: example/demo
+      to: /srv/www/demo
+
+pools:
+    - name: www
+      listen: /var/run/php5-fpm.sock
+      user: www-data
+      group: www-data
+
+sites:
+    - map: demo.vm.dvlpr.me
+      to: /srv/www/demo/public
+      pool: www
+
+variables:
+    - key: APP_ENV
+      value: local
+      pool: www
+
