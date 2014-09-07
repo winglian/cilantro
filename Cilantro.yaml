@@ -24,7 +24,8 @@ services:
       ports:
       - '80:80'
 
-mysql_password: secret
+mysql:
+    password: secret
 
 folders:
     - map: example/demo

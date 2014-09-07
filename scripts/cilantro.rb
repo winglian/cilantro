@@ -20,6 +20,13 @@ class Cilantro
             docker.vm.synced_folder "./build", "/vagrant/build"
             docker.vm.synced_folder "./etc", "/vagrant/etc"
             docker.vm.synced_folder "./usr", "/vagrant/usr"
+
+            docker.vm.provision :shell do |s|
+                s.inline = <<-EOT
+                    sudo /usr/local/bin/ntpclient -s -h pool.ntp.org
+                    date
+                EOT
+            end
         end
     end
 
@@ -41,7 +48,7 @@ class Cilantro
 
     def Cilantro.configureContainers(config, settings)
         # allow us to manage the docker host
-        if (ARGV[0] == 'status' || ARGV[0] == 'provision' || ARGV[0] == 'reload')
+        if (ARGV[0] == 'status' || ARGV[0] == 'provision' || ARGV[0] == 'reload' ||  ARGV[0] == 'ssh')
             self.configureProxy(config, settings)
         end
 
@@ -78,7 +85,7 @@ class Cilantro
                 d.name = 'mysql'
                 d.ports = ['3306:3306']
                 d.env    = {
-                    'MYSQL_ROOT_PASSWORD' => settings["mysql_password"] ||= "secret"
+                    'MYSQL_ROOT_PASSWORD' => settings["mysql"]["password"] ||= "secret"
                 }
                 d.vagrant_vagrantfile = "Vagrantfile.proxy"
                 # d.volumes = ["/srv/docker/mysql:/var/lib/mysql"]
