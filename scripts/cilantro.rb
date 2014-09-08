@@ -24,6 +24,8 @@ class Cilantro
             docker.vm.provision :shell do |s|
                 s.inline = <<-EOT
                     sudo /usr/local/bin/ntpclient -s -h pool.ntp.org
+                    sudo killall -9 ntpd
+                    sudo ntpd -p pool.ntp.org
                     date
                 EOT
             end
