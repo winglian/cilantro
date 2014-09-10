@@ -221,7 +221,6 @@ class Cilantro
 
                 # TODO dynamic mapping
                 services = settings["services"].group_by { |s| s["name"] }
-                puts services;
                 if services.has_key?("mysql")
                     d.link('mysql:' + services["mysql"][0]["alias"]);
                 end
