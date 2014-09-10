@@ -220,9 +220,17 @@ class Cilantro
                 end
 
                 # TODO dynamic mapping
-                d.link('mysql:db');
-                d.link('memcache:memcache');
-                d.link('gearman:gearman');
+                services = settings["services"].group_by { |s| s["name"] }
+                puts services;
+                if services.has_key?("mysql")
+                    d.link('mysql:' + services["mysql"][0]["alias"]);
+                end
+                if services.has_key?("memcache")
+                    d.link('memcache:' + services["memcache"][0]["alias"]);
+                end
+                if services.has_key?("gearman")
+                    d.link('gearman:' + services["gearman"][0]["alias"]);
+                end
             end
 
             web.vm.boot_timeout = 10
