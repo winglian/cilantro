@@ -87,6 +87,7 @@ class Cilantro
 
         settings["services"].each do |service|
             if service['name'] == 'mysql'
+                # TODO create a sql file to generate schemas and users
                 self.configureTutumMysql(config, settings, service)
             elsif service['name'] == 'memcache'
                 self.configureMemcache(config, settings)
@@ -231,7 +232,7 @@ class Cilantro
         config.vm.define "web" do |web|
             web.vm.hostname = "web"
             web.vm.provider "docker" do |d|
-                d.image = 'licoricelabs/cilantro-php:0.0.3'
+                d.image = 'licoricelabs/cilantro-php:0.0.5'
                 d.name = 'web'
                 d.ports = options['ports'] ||= ['80:80']
                 d.vagrant_vagrantfile = "Vagrantfile.proxy"

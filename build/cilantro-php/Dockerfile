@@ -11,7 +11,7 @@ RUN export LC_ALL=C && \
     apt-add-repository ppa:nginx/stable -y && \
     apt-add-repository ppa:ondrej/php5 -y && \
     apt-get update && \
-    apt-get install -y  --force-yes build-essential curl dos2unix gcc git libmcrypt4 libpcre3-dev make python2.7-dev python-pip re2c supervisor unattended-upgrades whois vim php5-cli php5-dev php-pear php5-mysqlnd php5-pgsql php5-sqlite php5-apcu php5-json php5-curl php5-gd php5-gmp php5-imap php5-mcrypt php5-xdebug php5-memcached php5-redis nginx php5-fpm openssh-server libgearman-dev && \
+    apt-get install -y  --force-yes build-essential curl dos2unix gcc git libmcrypt4 libpcre3-dev make python2.7-dev python-pip re2c supervisor unattended-upgrades whois vim php5-cli php5-dev php-pear php5-mysqlnd php5-pgsql php5-sqlite php5-apcu php5-json php5-curl php5-gd php5-gmp php5-imap php5-mcrypt php5-xdebug php5-memcached php5-redis nginx php5-fpm openssh-server libgearman-dev nodejs npm && \
     cd / && \
     rm -rf /var/cache/apt/archives/*.deb /var/lib/apt/lists/* /root/* && \
     apt-get clean
