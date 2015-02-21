@@ -2,8 +2,7 @@ class Cilantro
     def Cilantro.configureProxy(config, settings)
         config.vm.define "default" do |docker|
             docker.vm.box = "dduportal/boot2docker"
-            # docker.vm.box = "boot2docker/boot2docker"
-            docker.vm.provider :virtualbox do |vb|
+            docker.vm.provider "virtualbox" do |vb|
                 vb.name = "dockerhost"
                 vb.customize ["modifyvm", :id, "--memory", settings["memory"] ||= "2048"]
                 vb.customize ["modifyvm", :id, "--cpus", settings["cpus"] ||= "2"]
@@ -17,22 +16,25 @@ class Cilantro
 
             docker.vbguest.auto_update = false
 
-            docker.vm.provision :shell do |s|
+            docker.vm.provision "shell", run: "always" do |s|
                 s.inline = <<-EOT
                 id -u mysql &>/dev/null || sudo adduser -u 102 -S mysql
                 EOT
             end
             
             docker.vm.synced_folder ".", "/vagrant", disabled: true
+            default_mount_opts = ['nolock,vers=3,udp,noatime']
             settings["folders"].each do |folder|
-                docker.vm.synced_folder folder["map"], "/vagrant" + folder["to"], type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+                folder_mount_opts = [folder["mount_options"]]
+                mount_opts = folder_mount_opts.any? ? folder_mount_opts : default_mount_opts;
+                docker.vm.synced_folder folder["map"], "/vagrant" + folder["to"], type: "nfs", mount_options: mount_opts
             end
-            docker.vm.synced_folder "./srv/mysql", "/srv/docker/mysql", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
-            docker.vm.synced_folder "./srv/www", "/srv/docker/www", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
-            docker.vm.synced_folder "./build", "/vagrant/build", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
-            docker.vm.synced_folder "./etc", "/vagrant/etc", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
-            docker.vm.synced_folder "./usr", "/vagrant/usr", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
-            docker.vm.synced_folder "./logs", "/vagrant/logs", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+            docker.vm.synced_folder "./srv/mysql", "/srv/docker/mysql", type: "nfs", mount_options: default_mount_opts
+            docker.vm.synced_folder "./srv/www", "/srv/docker/www", type: "nfs", mount_options: default_mount_opts
+            docker.vm.synced_folder "./build", "/vagrant/build", type: "nfs", mount_options: default_mount_opts
+            docker.vm.synced_folder "./etc", "/vagrant/etc", type: "nfs", mount_options: default_mount_opts
+            docker.vm.synced_folder "./usr", "/vagrant/usr", type: "nfs", mount_options: default_mount_opts
+            docker.vm.synced_folder "./logs", "/vagrant/logs", type: "nfs", mount_options: default_mount_opts
           
             # docker.ssh.forward_agent = true
             # docker.ssh.password = "tcuser" 
@@ -46,7 +48,7 @@ class Cilantro
                 docker.ssh.private_key_path = "~/.vagrant.d/insecure_private_key"
             end
 
-            docker.vm.provision :shell do |s|
+            docker.vm.provision "shell", run: "always" do |s|
                 s.inline = <<-EOT
                     sudo /usr/local/bin/ntpclient -s -h pool.ntp.org
                     sudo killall -9 ntpd
@@ -75,7 +77,7 @@ class Cilantro
 
     def Cilantro.configureContainers(config, settings)
         # allow us to manage the docker host
-        if (ARGV[0] == 'status' || ARGV[0] == 'provision' || ARGV[0] == 'reload' ||  ARGV[0] == 'ssh' || ARGV[0] == 'box' || ARGV[0] == 'up')
+        if (ARGV[0] == 'status' || ARGV[0] == 'provision' || ARGV[0] == 'reload' ||  ARGV[0] == 'ssh' || ARGV[0] == 'box' || ARGV[0] == 'up' || ARGV[0] == 'destroy')
             self.configureProxy(config, settings)
         end
 
@@ -85,7 +87,6 @@ class Cilantro
 
         settings["services"].each do |service|
             if service['name'] == 'mysql'
-                # self.configureMysql(config, settings, service)
                 self.configureTutumMysql(config, settings, service)
             elsif service['name'] == 'memcache'
                 self.configureMemcache(config, settings)
@@ -264,7 +265,7 @@ class Cilantro
                 end
             end
 
-            web.vm.boot_timeout = 20
+            web.vm.boot_timeout = 10
 
             # TODO setup SSH keys
             web.ssh.private_key_path = "~/.vagrant.d/insecure_private_key"
@@ -275,13 +276,13 @@ class Cilantro
             web.vm.synced_folder "scripts", "/vagrant/scripts"
 
             # The www-data user should map to the docker UID so that synced folders play nicely
-            web.vm.provision "shell", inline:
+            web.vm.provision "shell", run: "always", inline:
                 "userdel www-data && useradd -d /var/www -s /usr/sbin/nologin -G staff www-data -u 501"
 
-            web.vm.provision "shell", inline:
+            web.vm.provision "shell", run: "always", inline:
                 "/usr/local/bin/composer self-update"
 
-            web.vm.provision "shell", inline:
+            web.vm.provision "shell", run: "always", inline:
                 "cat << EOF > /etc/php5/mods-available/xdebug.ini
 zend_extension=xdebug.so
 xdebug.default_enable = on
@@ -294,7 +295,7 @@ EOF"
             pools = {}
 
             settings["pools"].each do |pool|
-                web.vm.provision "shell" do |s|
+                web.vm.provision "shell", run: "always" do |s|
                     file = pool["file"] ||= "/docker/etc/php5/fpm/template.conf"
                     user = pool["user"] ||= 'www-data'
                     group = pool["group"] ||= 'www-data'
@@ -310,7 +311,7 @@ EOF"
             if settings.has_key?("variables")
               settings["variables"].each do |var|
                 pool = var["pool"] ||= 'www'
-                web.vm.provision "shell" do |s|
+                web.vm.provision "shell", run: "always" do |s|
                     s.inline = "echo \"\nenv[$1] = '$2'\" >> /etc/php5/fpm/pool.d/$3.conf"
                     s.args = [var["key"], var["value"], pool]
                 end
@@ -318,7 +319,9 @@ EOF"
             end
 
             settings["sites"].each do |site|
-                web.vm.provision "shell" do |s|
+                site_disabled = site["disabled"] ||= false
+                next if site_disabled
+                web.vm.provision "shell", run: "always" do |s|
                     config = site["ngx_config"] ||= "/docker/etc/nginx/default.conf"
                     pool = site["pool"] ||= "www"
                     s.inline = "cat $4 | sed -e \"s@\\\${server_name}@$1@g\" -e \"s@\\\${root}@$2@\" -e \"s@\\\${socket}@$3@\" | tee /etc/nginx/sites-available/$1 && \
@@ -327,7 +330,7 @@ EOF"
                 end
             end
 
-            web.vm.provision "shell" do |s|
+            web.vm.provision "shell", run: "always" do |s|
                 s.inline = "service php5-fpm restart && service nginx restart"
             end
 
