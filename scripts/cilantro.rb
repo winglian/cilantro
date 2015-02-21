@@ -183,7 +183,7 @@ class Cilantro
                 d.name = 'gearman'
                 d.ports = options['ports'] ||= ['4730:4730']
                 d.vagrant_vagrantfile = "Vagrantfile.proxy"
-                d.has_ssh = true
+                d.has_ssh = (ARGV[0] == 'ssh') # only need for debugging really
                 d.volumes = ["/vagrant/etc:/docker/etc", "/vagrant/usr:/docker/usr"]
                 d.env = {
                     "GEARMAND_PORT"         => 4730
@@ -204,7 +204,7 @@ class Cilantro
                 d.name = 'varnish'
                 d.ports = options['ports'] ||= ['80:80']
                 d.vagrant_vagrantfile = "Vagrantfile.proxy"
-                d.has_ssh = true
+                d.has_ssh = (ARGV[0] == 'ssh') # only need for debugging really
                 d.volumes = ["/vagrant/etc:/docker/etc", "/vagrant/usr:/docker/usr"]
                 vcl = '/etc/varnish/default.vcl';
                 if options.has_key?("vcl")
@@ -222,7 +222,7 @@ class Cilantro
             varnish.ssh.private_key_path = "~/.vagrant.d/insecure_private_key"
             varnish.ssh.username = 'root'
             varnish.ssh.port = 22
-            varnish.vm.boot_timeout = 20
+            varnish.vm.boot_timeout = 5
         end
     end
 
@@ -276,7 +276,7 @@ class Cilantro
 
             # The www-data user should map to the docker UID so that synced folders play nicely
             web.vm.provision "shell", inline:
-                "userdel www-data && useradd -d /var/www -s /usr/sbin/nologin -G staff www-data -u 1000"
+                "userdel www-data && useradd -d /var/www -s /usr/sbin/nologin -G staff www-data -u 501"
 
             web.vm.provision "shell", inline:
                 "/usr/local/bin/composer self-update"
