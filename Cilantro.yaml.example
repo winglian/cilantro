@@ -10,6 +10,8 @@ ssh:
     private: ~/.ssh/id_rsa
 
 services:
+    - name: mongo
+      alias: mongo
     - name: memcache
       alias: memcache
     - name: mysql
@@ -25,7 +27,13 @@ services:
       - '80:80'
 
 mysql:
+    username: admin
     password: secret
+    schemas:
+    - name: demo
+    users:
+    - username: homestead
+      password: secret
 
 folders:
     - map: example/demo

@@ -2,8 +2,13 @@ class Cilantro
     def Cilantro.configureProxy(config, settings)
         config.vm.define "default" do |docker|
             docker.vm.box = "dduportal/boot2docker"
+            # docker.vm.box = "boot2docker/boot2docker"
             docker.vm.provider :virtualbox do |vb|
                 vb.name = "dockerhost"
+                vb.customize ["modifyvm", :id, "--memory", settings["memory"] ||= "2048"]
+                vb.customize ["modifyvm", :id, "--cpus", settings["cpus"] ||= "2"]
+                vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+                vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
             end
 
             if !settings['ip'].nil?
@@ -11,15 +16,35 @@ class Cilantro
             end
 
             docker.vbguest.auto_update = false
+
+            docker.vm.provision :shell do |s|
+                s.inline = <<-EOT
+                id -u mysql &>/dev/null || sudo adduser -u 102 -S mysql
+                EOT
+            end
             
             docker.vm.synced_folder ".", "/vagrant", disabled: true
             settings["folders"].each do |folder|
-                docker.vm.synced_folder folder["map"], "/vagrant" + folder["to"], mount_options: folder["mount_options"] ||= ["dmode=775,fmode=664"]
+                docker.vm.synced_folder folder["map"], "/vagrant" + folder["to"], type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
             end
-            docker.vm.synced_folder "./srv", "/srv/docker"
-            docker.vm.synced_folder "./build", "/vagrant/build"
-            docker.vm.synced_folder "./etc", "/vagrant/etc"
-            docker.vm.synced_folder "./usr", "/vagrant/usr"
+            docker.vm.synced_folder "./srv/mysql", "/srv/docker/mysql", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+            docker.vm.synced_folder "./srv/www", "/srv/docker/www", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+            docker.vm.synced_folder "./build", "/vagrant/build", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+            docker.vm.synced_folder "./etc", "/vagrant/etc", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+            docker.vm.synced_folder "./usr", "/vagrant/usr", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+            docker.vm.synced_folder "./logs", "/vagrant/logs", type: "nfs", mount_options: ['nolock,vers=3,udp,noatime']
+          
+            # docker.ssh.forward_agent = true
+            # docker.ssh.password = "tcuser" 
+            docker.ssh.insert_key = false
+            if File.file?("./.vagrant/machines/default/virtualbox/private_key")
+                docker.ssh.private_key_path = [
+                     "./.vagrant/machines/default/virtualbox/private_key",
+                     "~/.vagrant.d/insecure_private_key"
+                ]
+            else
+                docker.ssh.private_key_path = "~/.vagrant.d/insecure_private_key"
+            end
 
             docker.vm.provision :shell do |s|
                 s.inline = <<-EOT
@@ -50,7 +75,7 @@ class Cilantro
 
     def Cilantro.configureContainers(config, settings)
         # allow us to manage the docker host
-        if (ARGV[0] == 'status' || ARGV[0] == 'provision' || ARGV[0] == 'reload' ||  ARGV[0] == 'ssh')
+        if (ARGV[0] == 'status' || ARGV[0] == 'provision' || ARGV[0] == 'reload' ||  ARGV[0] == 'ssh' || ARGV[0] == 'box' || ARGV[0] == 'up')
             self.configureProxy(config, settings)
         end
 
@@ -60,7 +85,8 @@ class Cilantro
 
         settings["services"].each do |service|
             if service['name'] == 'mysql'
-                self.configureMysql(config, settings, service)
+                # self.configureMysql(config, settings, service)
+                self.configureTutumMysql(config, settings, service)
             elsif service['name'] == 'memcache'
                 self.configureMemcache(config, settings)
             elsif service['name'] == 'mongo'
@@ -79,18 +105,20 @@ class Cilantro
         end
     end
 
-    def Cilantro.configureMysql(config, settings, options)
+    def Cilantro.configureTutumMysql(config, settings, options)
         # Configure the Mysql Box
         config.vm.define "mysql" do |mysql|
             mysql.vm.provider "docker" do |d|
-                d.image = 'mysql:5.6.20'
+                d.vagrant_vagrantfile = "Vagrantfile.proxy"
+                d.image = 'tutum/mysql'
                 d.name = 'mysql'
                 d.ports = ['3306:3306']
                 d.env    = {
-                    'MYSQL_ROOT_PASSWORD' => settings["mysql"]["password"] ||= "secret"
+                    'MYSQL_USER' => settings["mysql"]["username"] ||= "admin",
+                    'MYSQL_PASS' => settings["mysql"]["password"] ||= "secret"
                 }
-                d.vagrant_vagrantfile = "Vagrantfile.proxy"
-                # d.volumes = ["/srv/docker/mysql:/var/lib/mysql"]
+                d.cmd = ['/run.sh']
+                d.volumes = ["/srv/docker/mysql:/var/lib/mysql"]
             end
             mysql.vm.synced_folder ".", "/vagrant", disabled: true
         end
@@ -113,7 +141,7 @@ class Cilantro
         config.vm.define "mongo" do |mongo|
             mongo.vm.provider "docker" do |d|
                 d.image = 'mongo:2.7.5'
-                d.name = 'web_mongo'
+                d.name = 'mongo'
                 d.ports = ['27017:27017']
                 d.vagrant_vagrantfile = "Vagrantfile.proxy"
                 # d.volumes = ["/srv/docker/mongo:/data/db"]
@@ -164,7 +192,8 @@ class Cilantro
             
             gearman.ssh.private_key_path = "~/.vagrant.d/insecure_private_key"
             gearman.ssh.username = 'root'
-            gearman.vm.boot_timeout = 10
+            gearman.ssh.port = 22
+            gearman.vm.boot_timeout = 20
         end
     end
 
@@ -192,12 +221,14 @@ class Cilantro
             # TODO setup SSH keys
             varnish.ssh.private_key_path = "~/.vagrant.d/insecure_private_key"
             varnish.ssh.username = 'root'
-            varnish.vm.boot_timeout = 10
+            varnish.ssh.port = 22
+            varnish.vm.boot_timeout = 20
         end
     end
 
     def Cilantro.configureWeb(config, settings, options)
         config.vm.define "web" do |web|
+            web.vm.hostname = "web"
             web.vm.provider "docker" do |d|
                 d.image = 'licoricelabs/cilantro-php:0.0.3'
                 d.name = 'web'
@@ -209,8 +240,6 @@ class Cilantro
                     d.volumes << "/vagrant" + folder["to"] + ":" + folder["to"]
                 end
 
-                # TODO php-fpm pool per site
-                
                 # map environment variables
                 d.env = {};
                 if settings.has_key?("variables")
@@ -230,13 +259,17 @@ class Cilantro
                 if services.has_key?("gearman")
                     d.link('gearman:' + services["gearman"][0]["alias"]);
                 end
+                if services.has_key?("mongo")
+                    d.link('mongo:' + services["mongo"][0]["alias"]);
+                end
             end
 
-            web.vm.boot_timeout = 10
+            web.vm.boot_timeout = 20
 
             # TODO setup SSH keys
             web.ssh.private_key_path = "~/.vagrant.d/insecure_private_key"
             web.ssh.username = 'root'
+            web.ssh.port = 22
 
             web.vm.synced_folder ".", "/vagrant", disabled: true
             web.vm.synced_folder "scripts", "/vagrant/scripts"
@@ -244,6 +277,19 @@ class Cilantro
             # The www-data user should map to the docker UID so that synced folders play nicely
             web.vm.provision "shell", inline:
                 "userdel www-data && useradd -d /var/www -s /usr/sbin/nologin -G staff www-data -u 1000"
+
+            web.vm.provision "shell", inline:
+                "/usr/local/bin/composer self-update"
+
+            web.vm.provision "shell", inline:
+                "cat << EOF > /etc/php5/mods-available/xdebug.ini
+zend_extension=xdebug.so
+xdebug.default_enable = on
+xdebug.remote_enable = on
+xdebug.remote_connect_back = on
+xdebug.idekey = 'vagrant'
+xdebug.max_nesting_level = 500
+EOF"
 
             pools = {}
 
@@ -275,7 +321,7 @@ class Cilantro
                 web.vm.provision "shell" do |s|
                     config = site["ngx_config"] ||= "/docker/etc/nginx/default.conf"
                     pool = site["pool"] ||= "www"
-                    s.inline = "cat $4 | sed -e \"s@\\\${server_name}@$1@\" -e \"s@\\\${root}@$2@\" -e \"s@\\\${socket}@$3@\" | tee /etc/nginx/sites-available/$1 && \
+                    s.inline = "cat $4 | sed -e \"s@\\\${server_name}@$1@g\" -e \"s@\\\${root}@$2@\" -e \"s@\\\${socket}@$3@\" | tee /etc/nginx/sites-available/$1 && \
                     ln -fs /etc/nginx/sites-available/$1 /etc/nginx/sites-enabled/$1"
                     s.args = [site["map"], site["to"], pools[pool]["socket"], config]
                 end

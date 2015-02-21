@@ -1,4 +1,7 @@
 FROM ubuntu:trusty
+MAINTAINER Wing Lian <wing.lian@gmail.com>
+
+VOLUME /srv/www
 
 RUN export LC_ALL=C && \
     export DEBIAN_FRONTEND=noninteractive && \
@@ -50,9 +53,9 @@ RUN mkdir /root/.ssh && \
     update-rc.d ssh defaults
 
 RUN userdel www-data && \
-    useradd -d /var/www -s /usr/sbin/nologin -G staff www-data -u 1000
+    useradd -d /srv/www -s /usr/sbin/nologin -G staff www-data -u 1000
 
-EXPOSE 80 22 9000
+EXPOSE 80 22
 ADD configure.sh /root/configure.sh
 ADD entrypoint.sh /root/entrypoint.sh
 ENTRYPOINT ["/root/entrypoint.sh"]
