@@ -29,6 +29,7 @@ class Cilantro
                 mount_opts = folder_mount_opts.any? ? folder_mount_opts : default_mount_opts;
                 docker.vm.synced_folder folder["map"], "/vagrant" + folder["to"], type: "nfs", mount_options: mount_opts
             end
+            docker.vm.synced_folder "./srv/rethinkdb", "/srv/docker/rethinkdb", type: "nfs", mount_options: default_mount_opts
             docker.vm.synced_folder "./srv/mysql", "/srv/docker/mysql", type: "nfs", mount_options: default_mount_opts
             docker.vm.synced_folder "./srv/www", "/srv/docker/www", type: "nfs", mount_options: default_mount_opts
             docker.vm.synced_folder "./build", "/vagrant/build", type: "nfs", mount_options: default_mount_opts
@@ -99,6 +100,8 @@ class Cilantro
                 self.configurePostgres(config, settings)
             elsif service['name'] == 'gearman'
                 self.configureGearman(config, settings, service)
+            elsif service['name'] == 'rethinkdb'
+                self.configureRethinkdb(config, settings, service)
             elsif service['name'] == 'web'
                 self.configureWeb(config, settings, service)
             elsif service['name'] == 'varnish'
@@ -107,6 +110,23 @@ class Cilantro
         end
     end
 
+    def Cilantro.configureRethinkdb(config, settings, options)
+        # Configure the rethinkdb
+        config.vm.define "rethinkdb" do |rethinkdb|
+            rethinkdb.vm.provider "docker" do |d|
+                d.vagrant_vagrantfile = "Vagrantfile.proxy"
+                d.image = options["image"] ||= 'rethinkdb'
+                d.name = 'rethinkdb'
+                d.ports = options['ports'] ||= ['29015:29015', '28015:28015']
+                d.env    = {
+                }
+                d.cmd = ["rethinkdb", "--bind", "all"]
+                d.volumes = ["/srv/docker/rethinkdb:/data"]
+            end
+            rethinkdb.vm.synced_folder ".", "/vagrant", disabled: true
+        end
+    end
+        
     def Cilantro.configureTutumMysql(config, settings, options)
         # Configure the Mysql Box
         config.vm.define "mysql" do |mysql|
@@ -156,7 +176,7 @@ class Cilantro
         config.vm.define "redis" do |redis|
             redis.vm.provider "docker" do |d|
                 d.image = 'redis'
-                d.name = 'web_redis'
+                d.name = 'redis'
                 d.ports = ['6379:6379']
                 d.vagrant_vagrantfile = "Vagrantfile.proxy"
                 # d.volumes = ["/srv/docker/redis:/data"]
@@ -232,7 +252,7 @@ class Cilantro
         config.vm.define "web" do |web|
             web.vm.hostname = "web"
             web.vm.provider "docker" do |d|
-                d.image = 'licoricelabs/cilantro-php:0.0.5'
+                d.image = 'licoricelabs/cilantro-php:latest'
                 d.name = 'web'
                 d.ports = options['ports'] ||= ['80:80']
                 d.vagrant_vagrantfile = "Vagrantfile.proxy"
@@ -258,11 +278,17 @@ class Cilantro
                 if services.has_key?("memcache")
                     d.link('memcache:' + services["memcache"][0]["alias"]);
                 end
+                if services.has_key?("rethinkdb")
+                    d.link('rethinkdb:' + services["rethinkdb"][0]["alias"]);
+                end
                 if services.has_key?("gearman")
                     d.link('gearman:' + services["gearman"][0]["alias"]);
                 end
                 if services.has_key?("mongo")
                     d.link('mongo:' + services["mongo"][0]["alias"]);
+                end
+                if services.has_key?("redis")
+                    d.link('redis:' + services["redis"][0]["alias"]);
                 end
             end
 
@@ -279,6 +305,10 @@ class Cilantro
             # The www-data user should map to the docker UID so that synced folders play nicely
             web.vm.provision "shell", run: "always", inline:
                 "userdel www-data && useradd -d /var/www -s /usr/sbin/nologin -G staff www-data -u 501"
+
+            # fixes issues with getaddrinfo from php from the web service
+            web.vm.provision "shell", run: "always", inline:
+                "chmod 0644 /etc/resolv.conf"
 
             web.vm.provision "shell", run: "always", inline:
                 "/usr/local/bin/composer self-update"
@@ -312,6 +342,7 @@ EOF"
             if settings.has_key?("variables")
               settings["variables"].each do |var|
                 pool = var["pool"] ||= 'www'
+                # TODO make sure the pool exists
                 web.vm.provision "shell", run: "always" do |s|
                     s.inline = "echo \"\nenv[$1] = '$2'\" >> /etc/php5/fpm/pool.d/$3.conf"
                     s.args = [var["key"], var["value"], pool]

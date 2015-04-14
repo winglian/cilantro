@@ -11,7 +11,8 @@ RUN export LC_ALL=C && \
     apt-add-repository ppa:nginx/stable -y && \
     apt-add-repository ppa:ondrej/php5 -y && \
     apt-get update && \
-    apt-get install -y  --force-yes build-essential curl dos2unix gcc git libmcrypt4 libpcre3-dev make python2.7-dev python-pip re2c supervisor unattended-upgrades whois vim php5-cli php5-dev php-pear php5-mysqlnd php5-pgsql php5-sqlite php5-apcu php5-json php5-curl php5-gd php5-gmp php5-imap php5-mcrypt php5-xdebug php5-memcached php5-redis nginx php5-fpm openssh-server libgearman-dev nodejs npm && \
+    apt-get install -y  --force-yes build-essential curl dos2unix gcc git libmcrypt4 libpcre3-dev make python2.7-dev python-pip re2c supervisor unattended-upgrades whois nano php5-cli php5-dev php-pear php5-mysqlnd php5-pgsql php5-sqlite php5-apcu php5-json php5-curl php5-gd php5-gmp php5-imap php5-mcrypt php5-xdebug php5-memcached php5-redis php5-imagick php5-mongo nginx php5-fpm openssh-server libgearman-dev nodejs npm vim && \
+    apt-get install -y  --force-yes mysql-client python-protobuf optipng pngcrush pngquant zopfli && \
     cd / && \
     rm -rf /var/cache/apt/archives/*.deb /var/lib/apt/lists/* /root/* && \
     apt-get clean
@@ -22,6 +23,9 @@ RUN pecl install mailparse && \
     mv composer.phar /usr/local/bin/composer && \
     printf "\n" | pecl install memcache && echo "extension=memcache.so" | tee /etc/php5/mods-available/memcache.ini && \
     pecl install gearman  && echo "extension=gearman.so" | tee /etc/php5/mods-available/gearman.ini
+
+RUN npm install -g foreman dotenv mysql && \
+    ln -s /usr/bin/nodejs /usr/bin/node
 
 RUN sed -i "s/error_reporting = .*/error_reporting = E_ALL/" /etc/php5/cli/php.ini && \
     sed -i "s/display_errors = .*/display_errors = On/" /etc/php5/cli/php.ini && \

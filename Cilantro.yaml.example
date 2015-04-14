@@ -18,12 +18,14 @@ services:
       alias: db
     - name: gearman
       alias: gearman
+    - name: rethinkdb
+      alias: rethinkdb
+      ports:
+      - '29015:29015'
+      - '28015:28015'
+      - '8080:8080'
     - name: web
       ports: 
-      - '8080:80'
-    - name: varnish
-      vcl: etc/varnish/default.vcl
-      ports:
       - '80:80'
 
 mysql:
