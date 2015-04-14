@@ -18,7 +18,8 @@ class Cilantro
 
             docker.vm.provision "shell", run: "always" do |s|
                 s.inline = <<-EOT
-                id -u mysql &>/dev/null || sudo adduser -u 102 -S mysql
+                id -u mysql &>/dev/null || sudo adduser -u 501 -S mysql
+                # sudo mkdir -p /srv/docker/mysql && sudo chmod 0777 /srv/docker/mysql
                 EOT
             end
             
