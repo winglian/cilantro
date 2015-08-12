@@ -11,8 +11,8 @@ RUN export LC_ALL=C && \
     apt-add-repository ppa:nginx/stable -y && \
     apt-add-repository ppa:ondrej/php5 -y && \
     apt-get update && \
-    apt-get install -y  --force-yes build-essential curl dos2unix gcc git libmcrypt4 libpcre3-dev make python2.7-dev python-pip re2c supervisor unattended-upgrades whois nano php5-cli php5-dev php-pear php5-mysqlnd php5-pgsql php5-sqlite php5-apcu php5-json php5-curl php5-gd php5-gmp php5-imap php5-mcrypt php5-xdebug php5-memcached php5-redis php5-imagick php5-mongo nginx php5-fpm openssh-server libgearman-dev nodejs npm vim && \
-    apt-get install -y  --force-yes mysql-client python-protobuf optipng pngcrush pngquant zopfli && \
+    apt-get install -y  --force-yes build-essential curl dos2unix gcc git libmcrypt4 libpcre3-dev make python2.7-dev python-pip re2c supervisor unattended-upgrades whois nano php5-cli php5-dev php-pear php5-mysqlnd php5-pgsql php5-sqlite php5-apcu php5-json php5-curl php5-gd php5-gmp php5-imap php5-mcrypt php5-xdebug php5-memcached php5-redis php5-imagick php5-mongo nginx php5-fpm openssh-server libgearman-dev nodejs npm vim screen && \
+    apt-get install -y  --force-yes mysql-client python-protobuf optipng pngcrush pngquant zopfli libprotobuf-dev protobuf-compiler && \
     cd / && \
     rm -rf /var/cache/apt/archives/*.deb /var/lib/apt/lists/* /root/* && \
     apt-get clean

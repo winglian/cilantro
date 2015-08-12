@@ -2,13 +2,17 @@ class Cilantro
     def Cilantro.configureProxy(config, settings)
         config.vm.define "default" do |docker|
             docker.vm.box = "dduportal/boot2docker"
+            docker.vm.box_version = "1.5.0"
             docker.vm.provider "virtualbox" do |vb|
                 vb.name = "dockerhost"
-                vb.customize ["modifyvm", :id, "--memory", settings["memory"] ||= "2048"]
-                vb.customize ["modifyvm", :id, "--cpus", settings["cpus"] ||= "2"]
+                vb.customize ["modifyvm", :id, "--memory", settings["memory"] ||= `sysctl -n hw.memsize`.to_i / 1024 / 1024 / 4 ]
+                vb.customize ["modifyvm", :id, "--cpus", settings["cpus"] ||= `sysctl -n hw.ncpu`.to_i ]
                 vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
                 vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
             end
+
+            docker.nfs.map_uid = Process.uid
+            docker.nfs.map_gid = Process.gid
 
             if !settings['ip'].nil?
                 docker.vm.network :private_network, ip: settings["ip"], netmask: settings["netmask"] ||= nil
@@ -19,6 +23,13 @@ class Cilantro
             docker.vm.provision "shell", run: "always" do |s|
                 s.inline = <<-EOT
                 id -u mysql &>/dev/null || sudo adduser -u 501 -S mysql
+                mkdir  -p /srv/docker/mysql2
+                if [ ! -f /srv/docker/mysql/mysql.img ]; then
+                    dd if=/dev/zero of=/srv/docker/mysql/mysql.img bs=1 count=0 seek=20G
+                    losetup /dev/loop1 /srv/docker/mysql/mysql.img
+                    mkfs.ext4 /dev/loop1
+                fi
+                sudo mount /srv/docker/mysql/mysql.img /srv/docker/mysql2
                 # sudo mkdir -p /srv/docker/mysql && sudo chmod 0777 /srv/docker/mysql
                 EOT
             end
@@ -141,7 +152,7 @@ class Cilantro
                     'MYSQL_PASS' => settings["mysql"]["password"] ||= "secret"
                 }
                 d.cmd = ['/run.sh']
-                d.volumes = ["/srv/docker/mysql:/var/lib/mysql"]
+                d.volumes = ["/srv/docker/mysql2:/var/lib/mysql"]
             end
             mysql.vm.synced_folder ".", "/vagrant", disabled: true
         end
