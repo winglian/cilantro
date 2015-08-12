@@ -10,32 +10,18 @@ ssh:
     private: ~/.ssh/id_rsa
 
 services:
-    - name: mongo
-      alias: mongo
     - name: memcache
       alias: memcache
     - name: mysql
       alias: db
-    - name: gearman
-      alias: gearman
-    - name: rethinkdb
-      alias: rethinkdb
-      ports:
-      - '29015:29015'
-      - '28015:28015'
-      - '8080:8080'
     - name: web
       ports: 
       - '80:80'
+      - '443:443'
 
 mysql:
     username: admin
     password: secret
-    schemas:
-    - name: demo
-    users:
-    - username: homestead
-      password: secret
 
 folders:
     - map: example/demo
